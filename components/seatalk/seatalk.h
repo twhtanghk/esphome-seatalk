@@ -2,6 +2,7 @@
 #define __SEATALK_H__
 
 #include "esphome.h"
+#include "esphome/components/uart/uart.h"
 #include <vector>
 
 namespace esphome {
@@ -10,28 +11,24 @@ namespace seatalk {
 // Forward declarations
 class SeaTalkListener;
 class SeaTalkComponent;
-class SeaTalkDepthSensor;
-class SeaTalkSpeedSensor;
-class SeaTalkWindAngleSensor;
-class SeaTalkWindSpeedSensor;
-class SeaTalkHeadingSensor;
-class SeaTalkTemperatureSensor;
-class SeaTalkLogSensor;
 
-}  // namespace seatalk
-}  // namespace esphome
-
-namespace esphome {
-namespace seatalk {
-
-// Forward declarations
-class SeaTalkListener;
+class SeaTalkListener {
+ public:
+  virtual void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) = 0;
+  virtual ~SeaTalkListener() = default;
+};
 
 class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
  public:
-  SeaTalkComponent(uart::UARTComponent *parent) : uart::UARTDevice(parent), PollingComponent(1000) {}
+  SeaTalkComponent(uart::UARTComponent *parent) 
+      : PollingComponent(1000),
+        uart::UARTDevice(parent)
+  {
+    ESP_LOGI("seatalk", "SeaTalk component created");
+  }
   
   void setup() override {
+    ESP_LOGI("seatalk", "SeaTalk component initializing...");
     while (this->available()) {
       this->read();
     }
@@ -48,30 +45,31 @@ class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
   void update() override {}
 
   void add_listener(SeaTalkListener *listener) {
-    listeners_.push_back(listener);
+    if (listener) {
+      listeners_.push_back(listener);
+    }
   }
 
  private:
+  std::vector<SeaTalkListener *> listeners_;
+  std::vector<uint8_t> data_;
+  uint8_t command_ = 0;
+  uint8_t expected_length_ = 0;
+  
   enum class ParseState {
     WAIT_FOR_START,
     IN_MESSAGE
-  };
-
-  ParseState state_ = ParseState::WAIT_FOR_START;
-  uint8_t command_ = 0;
-  uint8_t expected_length_ = 0;
-  std::vector<uint8_t> data_;
-  std::vector<SeaTalkListener *> listeners_;
+  } state_ = ParseState::WAIT_FOR_START;
 
   uint8_t get_expected_length(uint8_t command) {
     switch (command) {
-      case 0x01: return 4;  // Depth
-      case 0x20: return 3;  // Apparent wind angle
-      case 0x21: return 2;  // Apparent wind speed
-      case 0x22: return 2;  // Speed through water
-      case 0x23: return 3;  // Water temperature
-      case 0x26: return 3;  // Total log
-      case 0x30: return 2;  // Compass heading
+      case 0x01: return 4;
+      case 0x20: return 3;
+      case 0x21: return 2;
+      case 0x22: return 2;
+      case 0x23: return 3;
+      case 0x26: return 3;
+      case 0x30: return 2;
       default: return 2;
     }
   }
@@ -83,13 +81,14 @@ class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
           command_ = byte;
           expected_length_ = get_expected_length(command_);
           data_.clear();
+          data_.push_back(byte);
           state_ = ParseState::IN_MESSAGE;
         }
         break;
 
       case ParseState::IN_MESSAGE:
         data_.push_back(byte);
-        if (data_.size() == expected_length_) {
+        if (data_.size() >= expected_length_ + 1) {
           handle_complete_message();
           state_ = ParseState::WAIT_FOR_START;
         }
@@ -98,23 +97,33 @@ class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
   }
 
   void handle_complete_message() {
-    ESP_LOGD("seatalk", "Message: cmd=0x%02X", command_);
+    std::vector<uint8_t> payload(data_.begin() + 1, data_.end());
     for (auto *listener : listeners_) {
-      listener->on_seatalk_message(command_, data_);
+      if (listener) {
+        listener->on_seatalk_message(command_, payload);
+      }
     }
   }
 };
 
-class SeaTalkListener {
+// Sensor base class - now stores parent reference
+class SeaTalkSensor : public sensor::Sensor, public SeaTalkListener {
  public:
-  virtual void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) = 0;
+  SeaTalkSensor(SeaTalkComponent *parent) : sensor::Sensor() {
+    if (parent) {
+      parent->add_listener(this);
+    }
+  }
+  virtual ~SeaTalkSensor() = default;
 };
 
-// All sensor classes must be properly defined
-class SeaTalkDepthSensor : public sensor::Sensor, public SeaTalkListener {
+// Individual sensor implementations - updated constructors
+class SeaTalkDepthSensor : public SeaTalkSensor {
  public:
+  SeaTalkDepthSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
-    if (command == 0x01 && data.size() >= 4) {
+    if (command == 0x01 && data.size() >= 3) {
       uint16_t raw_depth = (data[0] << 8) | data[1];
       float depth_feet = raw_depth * 0.1f;
       float depth_meters = depth_feet * 0.3048f;
@@ -123,8 +132,10 @@ class SeaTalkDepthSensor : public sensor::Sensor, public SeaTalkListener {
   }
 };
 
-class SeaTalkSpeedSensor : public sensor::Sensor, public SeaTalkListener {
+class SeaTalkSpeedSensor : public SeaTalkSensor {
  public:
+  SeaTalkSpeedSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
     if (command == 0x22 && data.size() >= 2) {
       uint16_t raw_speed = ((data[0] & 0x7F) << 8) | data[1];
@@ -134,18 +145,22 @@ class SeaTalkSpeedSensor : public sensor::Sensor, public SeaTalkListener {
   }
 };
 
-class SeaTalkWindAngleSensor : public sensor::Sensor, public SeaTalkListener {
+class SeaTalkWindAngleSensor : public SeaTalkSensor {
  public:
+  SeaTalkWindAngleSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
-    if (command == 0x20 && data.size() >= 3) {
+    if (command == 0x20 && data.size() >= 2) {
       int16_t angle = (data[0] * 2) - 180;
       publish_state(angle);
     }
   }
 };
 
-class SeaTalkWindSpeedSensor : public sensor::Sensor, public SeaTalkListener {
+class SeaTalkWindSpeedSensor : public SeaTalkSensor {
  public:
+  SeaTalkWindSpeedSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
     if (command == 0x21 && data.size() >= 2) {
       uint16_t raw_speed = (data[0] << 8) | data[1];
@@ -155,8 +170,10 @@ class SeaTalkWindSpeedSensor : public sensor::Sensor, public SeaTalkListener {
   }
 };
 
-class SeaTalkHeadingSensor : public sensor::Sensor, public SeaTalkListener {
+class SeaTalkHeadingSensor : public SeaTalkSensor {
  public:
+  SeaTalkHeadingSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
     if (command == 0x30 && data.size() >= 2) {
       uint16_t raw_heading = (data[0] << 8) | data[1];
@@ -166,10 +183,12 @@ class SeaTalkHeadingSensor : public sensor::Sensor, public SeaTalkListener {
   }
 };
 
-class SeaTalkTemperatureSensor : public sensor::Sensor, public SeaTalkListener {
+class SeaTalkTemperatureSensor : public SeaTalkSensor {
  public:
+  SeaTalkTemperatureSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
-    if (command == 0x23 && data.size() >= 3) {
+    if (command == 0x23 && data.size() >= 2) {
       uint16_t raw_temp = (data[0] << 8) | data[1];
       float temp_celsius = (raw_temp * 0.1f) - 10.0f;
       publish_state(temp_celsius);
@@ -177,8 +196,10 @@ class SeaTalkTemperatureSensor : public sensor::Sensor, public SeaTalkListener {
   }
 };
 
-class SeaTalkLogSensor : public sensor::Sensor, public SeaTalkListener {
+class SeaTalkLogSensor : public SeaTalkSensor {
  public:
+  SeaTalkLogSensor(SeaTalkComponent *parent) : SeaTalkSensor(parent) {}
+  
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
     if (command == 0x26 && data.size() >= 3) {
       uint32_t raw_log = (data[0] << 16) | (data[1] << 8) | data[2];
