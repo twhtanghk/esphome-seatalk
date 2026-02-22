@@ -9,6 +9,23 @@ namespace seatalk {
 
 // Forward declarations
 class SeaTalkListener;
+class SeaTalkComponent;
+class SeaTalkDepthSensor;
+class SeaTalkSpeedSensor;
+class SeaTalkWindAngleSensor;
+class SeaTalkWindSpeedSensor;
+class SeaTalkHeadingSensor;
+class SeaTalkTemperatureSensor;
+class SeaTalkLogSensor;
+
+}  // namespace seatalk
+}  // namespace esphome
+
+namespace esphome {
+namespace seatalk {
+
+// Forward declarations
+class SeaTalkListener;
 
 class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
  public:
