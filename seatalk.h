@@ -1,4 +1,3 @@
-// seatalk.h
 #ifndef __SEATALK_H__
 #define __SEATALK_H__
 
@@ -6,14 +5,16 @@
 #include <vector>
 
 namespace esphome {
-namespace seatalk {
+namespace seatalk {  // ← THIS NAMESPACE IS CRITICAL
 
-// Forward declarations
-class SeaTalkListener;
+class SeaTalkListener {
+ public:
+  virtual void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) = 0;
+};
 
 class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
  public:
-  SeaTalkComponent(UARTComponent *parent) : UARTDevice(parent), PollingComponent(1000) {}
+  SeaTalkComponent(uart::UARTComponent *parent) : uart::UARTDevice(parent), PollingComponent(1000) {}
   
   void setup() override {
     while (this->available()) {
@@ -29,9 +30,7 @@ class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
     }
   }
 
-  void update() override {
-    // Nothing to do here - messages processed in loop
-  }
+  void update() override {}
 
   void add_listener(SeaTalkListener *listener) {
     listeners_.push_back(listener);
@@ -91,12 +90,7 @@ class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
   }
 };
 
-class SeaTalkListener {
- public:
-  virtual void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) = 0;
-};
-
-// Sensor implementations
+// Sensor classes
 class SeaTalkDepthSensor : public sensor::Sensor, public SeaTalkListener {
  public:
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
