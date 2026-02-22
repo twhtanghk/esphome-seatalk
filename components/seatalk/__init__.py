@@ -5,8 +5,18 @@ from esphome.const import CONF_ID
 
 DEPENDENCIES = ['uart']
 
+# Define namespace
 seatalk_ns = cg.esphome_ns.namespace('seatalk')
 SeaTalkComponent = seatalk_ns.class_('SeaTalkComponent', cg.PollingComponent, uart.UARTDevice)
+
+# Define all sensor classes in the namespace
+SeaTalkDepthSensor = seatalk_ns.class_('SeaTalkDepthSensor', cg.Component)
+SeaTalkSpeedSensor = seatalk_ns.class_('SeaTalkSpeedSensor', cg.Component)
+SeaTalkWindAngleSensor = seatalk_ns.class_('SeaTalkWindAngleSensor', cg.Component)
+SeaTalkWindSpeedSensor = seatalk_ns.class_('SeaTalkWindSpeedSensor', cg.Component)
+SeaTalkHeadingSensor = seatalk_ns.class_('SeaTalkHeadingSensor', cg.Component)
+SeaTalkTemperatureSensor = seatalk_ns.class_('SeaTalkTemperatureSensor', cg.Component)
+SeaTalkLogSensor = seatalk_ns.class_('SeaTalkLogSensor', cg.Component)
 
 CONF_SEATALK_ID = 'seatalk_id'
 MULTI_CONF = True
@@ -20,8 +30,16 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
 
+# Export everything
 __all__ = [
     'seatalk_ns',
     'SeaTalkComponent',
+    'SeaTalkDepthSensor',
+    'SeaTalkSpeedSensor',
+    'SeaTalkWindAngleSensor',
+    'SeaTalkWindSpeedSensor',
+    'SeaTalkHeadingSensor',
+    'SeaTalkTemperatureSensor',
+    'SeaTalkLogSensor',
     'CONF_SEATALK_ID',
 ]

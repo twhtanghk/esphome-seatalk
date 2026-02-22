@@ -2,6 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
+    CONF_ID,
     ICON_GAUGE,
     ICON_THERMOMETER,
     ICON_WEATHER_WINDY,
@@ -10,11 +11,23 @@ from esphome.const import (
     DEVICE_CLASS_TEMPERATURE,
 )
 
-from . import seatalk_ns, SeaTalkComponent, CONF_SEATALK_ID
+# Import everything from __init__.py
+from . import (
+    seatalk_ns,
+    SeaTalkComponent,
+    SeaTalkDepthSensor,
+    SeaTalkSpeedSensor,
+    SeaTalkWindAngleSensor,
+    SeaTalkWindSpeedSensor,
+    SeaTalkHeadingSensor,
+    SeaTalkTemperatureSensor,
+    SeaTalkLogSensor,
+    CONF_SEATALK_ID,
+)
 
 DEPENDENCIES = ['seatalk']
 
-# Local constants (not imported from esphome.const)
+# Local constants
 CONF_DEPTH = 'depth'
 CONF_SPEED = 'speed'
 CONF_TEMPERATURE = 'temperature'
@@ -22,15 +35,6 @@ CONF_WIND_ANGLE = 'wind_angle'
 CONF_WIND_SPEED = 'wind_speed'
 CONF_HEADING = 'heading'
 CONF_LOG_TOTAL = 'log_total'
-
-# Sensor classes (must match C++ class names)
-SeaTalkDepthSensor = seatalk_ns.class_('SeaTalkDepthSensor', sensor.Sensor)
-SeaTalkSpeedSensor = seatalk_ns.class_('SeaTalkSpeedSensor', sensor.Sensor)
-SeaTalkWindAngleSensor = seatalk_ns.class_('SeaTalkWindAngleSensor', sensor.Sensor)
-SeaTalkWindSpeedSensor = seatalk_ns.class_('SeaTalkWindSpeedSensor', sensor.Sensor)
-SeaTalkHeadingSensor = seatalk_ns.class_('SeaTalkHeadingSensor', sensor.Sensor)
-SeaTalkTemperatureSensor = seatalk_ns.class_('SeaTalkTemperatureSensor', sensor.Sensor)
-SeaTalkLogSensor = seatalk_ns.class_('SeaTalkLogSensor', sensor.Sensor)
 
 # Configuration schema
 CONFIG_SCHEMA = cv.Schema({

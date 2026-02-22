@@ -5,12 +5,10 @@
 #include <vector>
 
 namespace esphome {
-namespace seatalk {  // ← THIS NAMESPACE IS CRITICAL
+namespace seatalk {
 
-class SeaTalkListener {
- public:
-  virtual void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) = 0;
-};
+// Forward declarations
+class SeaTalkListener;
 
 class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
  public:
@@ -90,7 +88,12 @@ class SeaTalkComponent : public PollingComponent, public uart::UARTDevice {
   }
 };
 
-// Sensor classes
+class SeaTalkListener {
+ public:
+  virtual void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) = 0;
+};
+
+// All sensor classes must be properly defined
 class SeaTalkDepthSensor : public sensor::Sensor, public SeaTalkListener {
  public:
   void on_seatalk_message(uint8_t command, const std::vector<uint8_t> &data) override {
