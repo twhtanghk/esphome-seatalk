@@ -10,7 +10,7 @@ from esphome.const import (
     DEVICE_CLASS_TEMPERATURE,
 )
 
-from . import seatalk_ns, CONF_SEATALK_ID
+from . import seatalk_ns, SeaTalkComponent, CONF_SEATALK_ID
 
 DEPENDENCIES = ['seatalk']
 
